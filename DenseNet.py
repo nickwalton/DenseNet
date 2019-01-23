@@ -24,9 +24,9 @@ class DenseBlock(nn.Module):
         self.layers = nn.ModuleList()
 
         for i in range(n_layers):
-            batch_norm = nn.BatchNorm2d(num_features=k0+k*i)
-            bottleneck = nn.Conv2d(k0+k*i, 4*k, kernel_size=1, stride=1, padding=0)
-            conv = nn.Conv2d(4*k, k, kernel_size=3, stride=1, padding=1)
+            batch_norm = nn.BatchNorm2d(num_features=k0+k*i).cuda()
+            bottleneck = nn.Conv2d(k0+k*i, 4*k, kernel_size=1, stride=1, padding=0).cuda()
+            conv = nn.Conv2d(4*k, k, kernel_size=3, stride=1, padding=1).cuda()
             self.layers.extend([batch_norm, self.activation, bottleneck, conv])
 
     def forward(self, x):
@@ -50,10 +50,10 @@ class DenseNet(nn.Module):
         k = 4
         self.fc_size = 14*14*4
 
-        self.dense_block = DenseBlock((input_size,input_size), n_layers=n_layers, k0=k0, k=k).cuda()
-        self.transition_conv = nn.Conv2d((n_layers*k + k0), 4, kernel_size=1, stride=1, padding=0)
-        self.transition_pool = nn.AvgPool2d(kernel_size=2, stride=2)
-        self.final_fc = nn.Linear(self.fc_size, output_size)
+        self.dense_block = DenseBlock(input_size, n_layers=n_layers, k0=k0, k=k)
+        self.transition_conv = nn.Conv2d(k+k0, 4, kernel_size=1, stride=1, padding=0).cuda()
+        self.transition_pool = nn.AvgPool2d(kernel_size=2, stride=2).cuda()
+        self.final_fc = nn.Linear(self.fc_size, output_size).cuda()
         self.softmax = nn.Softmax()
 
         self.net = nn.Sequential(self.dense_block, self.transition_conv,
@@ -78,16 +78,13 @@ def train(args, model, train_loader, optimizer, epoch):
         loss = F.nll_loss(output, target)
         loss.backward()
         optimizer.step()
-        if batch_idx % args["log_interval"] == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), loss.item()))
 
 
 def test(args, model, test_loader):
     model.eval()
     test_loss = 0
     correct = 0
+    num = 0
     with torch.no_grad():
         for data, target in test_loader:
             data, target = data.to("cuda"), target.to("cuda")
@@ -95,7 +92,8 @@ def test(args, model, test_loader):
             test_loss += F.nll_loss(output, target, reduction='sum').item() # sum up batch loss
             pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
             correct += pred.eq(target.view_as(pred)).sum().item()
-            print("Correct: ", str(correct/pred.shape[0]*100)+"%")
+            num += pred.shape[0]
+        print("Correct: ", str(correct/num*100)+"%")
 
 
 if __name__ == '__main__':
@@ -106,13 +104,13 @@ if __name__ == '__main__':
     args["lr"] = 1e-3
 
     train_loader = torch.utils.data.DataLoader(
-        datasets.MNIST('../data', train=True, download=True,
+        datasets.MNIST('./data', train=True, download=True,
         transform=transforms.Compose([transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))])),
         batch_size=batch_size, shuffle=True)
 
     test_loader = torch.utils.data.DataLoader(
-        datasets.MNIST('../data', train=False, transform=transforms.Compose([
+        datasets.MNIST('./data', train=False, transform=transforms.Compose([
         transforms.ToTensor(),transforms.Normalize((0.1307,), (0.3081,))])),
         batch_size=batch_size, shuffle=True)
 
