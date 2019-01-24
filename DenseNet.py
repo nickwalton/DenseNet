@@ -16,17 +16,21 @@ from torchvision import transforms, utils, datasets
 
 
 # Implemented DenseNet from https://arxiv.org/pdf/1608.06993.pdf
+
+
+# DenseBlock input should have k layers input and k layers output
 class DenseBlock(nn.Module):
-    def __init__(self, size, n_layers, k0, k):
+    def __init__(self, n_layers, k):
         super(DenseBlock, self).__init__()
         self.activation = nn.ReLU()
         self.n_layers = n_layers
         self.layers = nn.ModuleList()
 
+        # Each layer in the block takes in (i+1) * k inputs and produces k outputs
         for i in range(n_layers):
-            batch_norm = nn.BatchNorm2d(num_features=k0+k*i).cuda()
-            bottleneck = nn.Conv2d(k0+k*i, 4*k, kernel_size=1, stride=1, padding=0).cuda()
-            conv = nn.Conv2d(4*k, k, kernel_size=3, stride=1, padding=1).cuda()
+            batch_norm = nn.BatchNorm2d(num_features=(i+1)*k).cuda()
+            bottleneck = nn.Conv2d((i+1)*k, k, kernel_size=1, stride=1, padding=0).cuda()
+            conv = nn.Conv2d(k, k, kernel_size=3, stride=1, padding=1).cuda()
             self.layers.extend([batch_norm, self.activation, bottleneck, conv])
 
     def forward(self, x):
@@ -43,30 +47,40 @@ class DenseBlock(nn.Module):
         return state
 
 
+# DenseNet Model
 class DenseNet(nn.Module):
-    def __init__(self, input_size, output_size, n_layers):
+    def __init__(self, input_size, output_size, n_layers, n_dense_blocks=1, k=8, k0=1):
         super(DenseNet, self).__init__()
-        k0 = 1
-        k = 4
-        self.fc_size = 14*14*4
+        self.k = k
+        self.k0 = k0
+        self.input_filters = k0+k
+        self.dense_size = input_size
+        self.n_dense_blocks = n_dense_blocks
 
-        self.dense_block = DenseBlock(input_size, n_layers=n_layers, k0=k0, k=k)
-        self.transition_conv = nn.Conv2d(k+k0, 4, kernel_size=1, stride=1, padding=0).cuda()
-        self.transition_pool = nn.AvgPool2d(kernel_size=2, stride=2).cuda()
-        self.final_fc = nn.Linear(self.fc_size, output_size).cuda()
+        initial_conv = nn.Conv2d(k0, k, kernel_size=1, stride=1, padding=0).cuda()
+        self.layers = nn.ModuleList([initial_conv])
+
+        for i in range(self.n_dense_blocks):
+            self.dense_block = DenseBlock(n_layers=n_layers, k=k)
+            self.transition_conv = nn.Conv2d(k*2, k, kernel_size=1, stride=1, padding=0).cuda()
+            self.transition_pool = nn.AvgPool2d(kernel_size=2, stride=2).cuda()
+            self.dense_size = int(self.dense_size/2)
+            self.layers.extend([self.dense_block, self.transition_conv, self.transition_pool])
+
+        self.final_fc = nn.Linear(int(((input_size/(2**n_dense_blocks))**2)*8), output_size).cuda()
         self.softmax = nn.Softmax()
 
         self.net = nn.Sequential(self.dense_block, self.transition_conv,
                                  self.transition_pool, self.final_fc, self.softmax)
 
     def forward(self, x):
-        l1 = self.dense_block(x)
-        l2 = self.transition_conv(l1)
-        l3 = self.transition_pool(l2)
 
-        l4 = self.final_fc(l3.view(-1, self.fc_size))
-        l5 = self.softmax(l4)
-        return l5
+        for layer in self.layers:
+            x = layer(x)
+
+        fc = self.final_fc(x.view(-1, x.shape[1] * x.shape[2] * x.shape[3]))
+        output = self.softmax(fc)
+        return output
 
 
 def train(args, model, train_loader, optimizer, epoch):
@@ -99,9 +113,9 @@ def test(args, model, test_loader):
 if __name__ == '__main__':
     batch_size = 128
     args = dict()
-    args["epochs"] = 10
+    args["epochs"] = 100
     args["log_interval"] = 50
-    args["lr"] = 1e-3
+    args["lr"] = 3e-4
 
     train_loader = torch.utils.data.DataLoader(
         datasets.MNIST('./data', train=True, download=True,
@@ -114,8 +128,8 @@ if __name__ == '__main__':
         transforms.ToTensor(),transforms.Normalize((0.1307,), (0.3081,))])),
         batch_size=batch_size, shuffle=True)
 
-    model = DenseNet(28, 10, 4)
-    optimizer = optim.SGD(model.parameters(), lr=args["lr"])
+    model = DenseNet(28, 10, 4, n_dense_blocks=2)
+    optimizer = optim.Adam(model.parameters(), lr=args["lr"])
 
     for epoch in range(1, args["epochs"] + 1):
         train(args, model, train_loader, optimizer, epoch)
