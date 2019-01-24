@@ -286,7 +286,7 @@ if __name__ == '__main__':
         transforms.ToTensor(),transforms.Normalize((0.1307,), (0.3081,))])),
         batch_size=batch_size, shuffle=True)
 
-    model = DenseNet(input_depth=1)
+    model = DenseNet(input_depth=1, blocks_config=(4,4,4)).cuda()
     optimizer = optim.Adam(model.parameters(), lr=args["lr"])
 
     for epoch in range(1, args["epochs"] + 1):
