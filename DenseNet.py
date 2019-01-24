@@ -67,18 +67,17 @@ class DenseNet(nn.Module):
             self.dense_size = int(self.dense_size/2)
             self.layers.extend([self.dense_block, self.transition_conv, self.transition_pool])
 
-        self.final_fc = nn.Linear(int(((input_size/(2**n_dense_blocks))**2)*8), output_size).cuda()
+        self.semi_final_fc = nn.Linear(int(((input_size/(2**n_dense_blocks))**2)*8), output_size*8).cuda()
+        self.final_fc = nn.Linear(output_size*8, output_size).cuda()
         self.softmax = nn.Softmax()
-
-        self.net = nn.Sequential(self.dense_block, self.transition_conv,
-                                 self.transition_pool, self.final_fc, self.softmax)
 
     def forward(self, x):
 
         for layer in self.layers:
             x = layer(x)
 
-        fc = self.final_fc(x.view(-1, x.shape[1] * x.shape[2] * x.shape[3]))
+        semi_fc = self.semi_final_fc(x.view(-1, x.shape[1] * x.shape[2] * x.shape[3]))
+        fc = self.final_fc(semi_fc)
         output = self.softmax(fc)
         return output
 
