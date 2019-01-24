@@ -269,7 +269,7 @@ def test(args, model, test_loader, name):
 
 
 if __name__ == '__main__':
-    batch_size = 128
+    batch_size = 512
     args = dict()
     args["epochs"] = 100
     args["log_interval"] = 50
@@ -291,6 +291,7 @@ if __name__ == '__main__':
 
     for epoch in range(1, args["epochs"] + 1):
         train(args, model, train_loader, optimizer, epoch)
-        test(args, model, train_loader, "Epoch " + str(epoch) + " Train Accuracy")
-        test(args, model, test_loader, "Epoch " + str(epoch) + " Test Accuracy")
+        if epoch % 5 is 0:
+          test(args, model, train_loader, "Epoch " + str(epoch) + " Train Accuracy ")
+        test(args, model, test_loader, "Epoch " + str(epoch) + " Test Accuracy ")
 
