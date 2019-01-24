@@ -5,7 +5,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils, datasets
 
-
+# Include dropout
 # Implemented DenseNet from https://arxiv.org/pdf/1608.06993.pdf
 
 # DenseBlock input should have k layers input and k layers output
@@ -39,7 +39,7 @@ class DenseBlock(nn.Module):
 
 # DenseNet Model
 class DenseNet(nn.Module):
-    def __init__(self, input_size=28, output_size=10, n_layers=8, n_dense_blocks=2, k=8, k0=1):
+    def __init__(self, input_size=28, output_size=10, n_layers=4, n_dense_blocks=2, k=8, k0=1):
         super(DenseNet, self).__init__()
         self.k = k
         self.k0 = k0
@@ -75,6 +75,7 @@ class DenseNet(nn.Module):
 def train(args, model, train_loader, optimizer, epoch):
     model.train()
     correct = 0
+    total_loss = 0
     num = 0
     
     for batch_idx, (data, target) in enumerate(train_loader):
@@ -85,10 +86,12 @@ def train(args, model, train_loader, optimizer, epoch):
         correct += pred.eq(target.view_as(pred)).sum().item()
         num+= pred.shape[0]
         loss = F.nll_loss(output, target)
+        total_loss += loss
         loss.backward()
         optimizer.step()
         
-    print("Train Accuracy: " + str(correct/num*100)+"%")
+    print("  Train Accuracy: " + str(correct/num*100)+"%")
+    print("  Training Loss: " + str(total_loss/num))
 
 
 def test(args, model, test_loader, name):
@@ -104,7 +107,7 @@ def test(args, model, test_loader, name):
             pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
             correct += pred.eq(target.view_as(pred)).sum().item()
             num += pred.shape[0]
-        print("Test Accuracy: " + str(correct/num*100)+"%")
+        print("   Test Accuracy: " + str(correct/num*100)+"%")
 
 
 if __name__ == '__main__':
@@ -129,6 +132,7 @@ if __name__ == '__main__':
     optimizer = optim.Adam(model.parameters(), lr=args["lr"])
 
     for epoch in range(1, args["epochs"] + 1):
+        print("Epoch: ", str(epoch))
         train(args, model, train_loader, optimizer, epoch)
         test(args, model, test_loader, "Epoch " + str(epoch) + " Test Accuracy ")
 
