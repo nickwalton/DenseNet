@@ -67,7 +67,7 @@ class DenseNet(nn.Module):
             self.dense_size = int(self.dense_size/2)
             self.layers.extend([self.dense_block, self.transition_conv, self.transition_pool])
 
-        self.semi_final_fc = nn.Linear(int(((input_size/(2**n_dense_blocks))**2)*8), output_size*8).cuda()
+        self.semi_final_fc = nn.Linear(int(((input_size/(2**n_dense_blocks))**2)*k), output_size*8).cuda()
         self.final_fc = nn.Linear(output_size*8, output_size).cuda()
         self.softmax = nn.Softmax()
 
@@ -127,7 +127,7 @@ if __name__ == '__main__':
         transforms.ToTensor(),transforms.Normalize((0.1307,), (0.3081,))])),
         batch_size=batch_size, shuffle=True)
 
-    model = DenseNet(28, 10, 4, n_dense_blocks=2)
+    model = DenseNet(28, 10, 2, n_dense_blocks=1, k=4)
     optimizer = optim.Adam(model.parameters(), lr=args["lr"])
 
     for epoch in range(1, args["epochs"] + 1):
