@@ -74,13 +74,21 @@ class DenseNet(nn.Module):
 
 def train(args, model, train_loader, optimizer, epoch):
     model.train()
+    correct = 0
+    num = 0
+    
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to("cuda"), target.to("cuda")
         optimizer.zero_grad()
         output = model(data)
+        pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
+        correct += pred.eq(target.view_as(pred)).sum().item()
+        num+= pred.shape[0]
         loss = F.nll_loss(output, target)
         loss.backward()
         optimizer.step()
+        
+    print("Train Accuracy: " + str(correct/num*100)+"%")
 
 
 def test(args, model, test_loader, name):
@@ -96,15 +104,15 @@ def test(args, model, test_loader, name):
             pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
             correct += pred.eq(target.view_as(pred)).sum().item()
             num += pred.shape[0]
-        print(name + "correct: ", str(correct/num*100)+"%")
+        print("Test Accuracy: " + str(correct/num*100)+"%")
 
 
 if __name__ == '__main__':
     batch_size = 512
     args = dict()
-    args["epochs"] = 100
+    args["epochs"] = 1000
     args["log_interval"] = 50
-    args["lr"] = 3e-5
+    args["lr"] = 1e-4
 
     train_loader = torch.utils.data.DataLoader(
         datasets.MNIST('./data', train=True, download=True,
@@ -122,7 +130,5 @@ if __name__ == '__main__':
 
     for epoch in range(1, args["epochs"] + 1):
         train(args, model, train_loader, optimizer, epoch)
-        if epoch % 5 is 0:
-          test(args, model, train_loader, "Epoch " + str(epoch) + " Train Accuracy ")
         test(args, model, test_loader, "Epoch " + str(epoch) + " Test Accuracy ")
 
