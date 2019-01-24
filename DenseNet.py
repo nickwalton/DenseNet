@@ -17,6 +17,8 @@ from torchvision import transforms, utils, datasets
 
 # Implemented DenseNet from https://arxiv.org/pdf/1608.06993.pdf
 
+# TODO Normalize input data. 
+
 
 # DenseBlock input should have k layers input and k layers output
 class DenseBlock(nn.Module):
@@ -93,7 +95,7 @@ def train(args, model, train_loader, optimizer, epoch):
         optimizer.step()
 
 
-def test(args, model, test_loader):
+def test(args, model, test_loader, name):
     model.eval()
     test_loss = 0
     correct = 0
@@ -106,7 +108,7 @@ def test(args, model, test_loader):
             pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
             correct += pred.eq(target.view_as(pred)).sum().item()
             num += pred.shape[0]
-        print("Correct: ", str(correct/num*100)+"%")
+        print(name + "correct: ", str(correct/num*100)+"%")
 
 
 if __name__ == '__main__':
@@ -114,7 +116,7 @@ if __name__ == '__main__':
     args = dict()
     args["epochs"] = 100
     args["log_interval"] = 50
-    args["lr"] = 3e-4
+    args["lr"] = 3e-5
 
     train_loader = torch.utils.data.DataLoader(
         datasets.MNIST('./data', train=True, download=True,
@@ -132,5 +134,6 @@ if __name__ == '__main__':
 
     for epoch in range(1, args["epochs"] + 1):
         train(args, model, train_loader, optimizer, epoch)
-        test(args, model, test_loader)
+        test(args, model, train_loader, "Epoch " + str(epoch) + " Train Accuracy")
+        test(args, model, test_loader, "Epoch " + str(epoch) + " Test Accuracy")
 
