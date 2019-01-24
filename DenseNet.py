@@ -5,7 +5,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils, datasets
 
-# Include dropout
+# TODO Include dropout
 # Implemented DenseNet from https://arxiv.org/pdf/1608.06993.pdf
 
 # DenseBlock input should have k layers input and k layers output
