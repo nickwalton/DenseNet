@@ -5,7 +5,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils, datasets
 
-
+# TODO Include dropout
 # Implemented DenseNet from https://arxiv.org/pdf/1608.06993.pdf
 
 # DenseBlock input should have k layers input and k layers output
@@ -73,69 +73,6 @@ class DenseNet(nn.Module):
         if(self.type is "nominal"):
             output = self.softmax(output)
         return output
-
-
-def mnist_train(args, model, train_loader, optimizer, epoch, loss_func):
-    model.train()
-    correct = 0
-    num = 0
-
-    for batch_idx, (data, target) in enumerate(train_loader):
-        data, target = data.to("cuda"), target.to("cuda")
-        optimizer.zero_grad()
-        output = model(data)
-        pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
-        correct += pred.eq(target.view_as(pred)).sum().item()
-        num += pred.shape[0]
-        loss = loss_func(output, target)
-        loss.backward()
-        optimizer.step()
-
-    print("Train Accuracy: " + str(correct/num*100)+"%")
-
-
-def mnist_test(args, model, test_loader, name):
-    model.eval()
-    test_loss = 0
-    correct = 0
-    num = 0
-    with torch.no_grad():
-        for data, target in test_loader:
-            data, target = data.to("cuda"), target.to("cuda")
-            output = model(data)
-            test_loss += F.nll_loss(output, target, reduction='sum').item() # sum up batch loss
-            pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
-            correct += pred.eq(target.view_as(pred)).sum().item()
-            num += pred.shape[0]
-        print("Test Accuracy: " + str(correct/num*100)+"%")
-
-
-def mnist():
-    batch_size = 512
-    args = dict()
-    args["epochs"] = 1000
-    args["lr"] = 1e-4
-
-    train_loader = torch.utils.data.DataLoader(
-        datasets.MNIST('./data', train=True, download=True,
-                       transform=transforms.Compose([transforms.ToTensor(),
-                                                     transforms.Normalize((0.1307,), (0.3081,))])),
-        batch_size=batch_size, shuffle=True)
-
-    test_loader = torch.utils.data.DataLoader(
-        datasets.MNIST('./data', train=False, transform=transforms.Compose([
-            transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])),
-        batch_size=batch_size, shuffle=True)
-
-    model = DenseNet().cuda()
-    optimizer = optim.Adam(model.parameters(), lr=args["lr"])
-
-    for epoch in range(1, args["epochs"] + 1):
-        train(args, model, train_loader, optimizer, epoch)
-        test(args, model, test_loader, "Epoch " + str(epoch) + " Test Accuracy ")
-
-
-
 
 
 
