@@ -9,6 +9,8 @@ import pandas as pd
 from skimage import io, transform
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 
 class SinglePoseDataset(Dataset):
@@ -42,6 +44,7 @@ def train(model, train_loader, optimizer, loss_func):
     model.train()
     num = 0
     total_loss = 0
+    display = True
 
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to("cuda"), target.to("cuda")
@@ -52,6 +55,11 @@ def train(model, train_loader, optimizer, loss_func):
         total_loss += loss
         loss.backward()
         optimizer.step()
+
+        if display and batch_idx is 0:
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection='3d')
+
 
     print("Training Loss: " + str(total_loss.item()))
 
@@ -71,8 +79,8 @@ def test(model, test_loader, loss_func):
 
 def pose():
     batch_size = 48
-    lr = 1e-3
-    epochs = 100
+    lr = 1e-4
+    epochs = 5
 
     csv_path = "plane_data1/orientations.csv"
     image_dir = "plane_data1"
@@ -94,6 +102,8 @@ def pose():
     for epoch in range(1, epochs+1):
         train(model, train_loader, optimizer, loss_func)
         test(model, train_loader, loss_func)
+
+        torch.save(model, "models/single-pose-model")
 
 
 if __name__ == '__main__':
