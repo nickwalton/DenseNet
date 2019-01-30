@@ -39,13 +39,14 @@ class DenseBlock(nn.Module):
 
 # DenseNet Model
 class DenseNet(nn.Module):
-    def __init__(self, input_size=28, output_size=10, n_layers=8, n_dense_blocks=2, k=8, k0=1):
+    def __init__(self, input_size=28, output_size=10, n_layers=4, n_dense_blocks=2, k=8, k0=1, type="nominal"):
         super(DenseNet, self).__init__()
         self.k = k
         self.k0 = k0
         self.input_filters = k0+k
         self.dense_size = input_size
         self.n_dense_blocks = n_dense_blocks
+        self.type = type
 
         initial_conv = nn.Conv2d(k0, k, kernel_size=1, stride=1, padding=0).cuda()
         self.layers = nn.ModuleList([initial_conv])
@@ -67,31 +68,33 @@ class DenseNet(nn.Module):
             x = layer(x)
 
         semi_fc = self.semi_final_fc(x.view(-1, x.shape[1] * x.shape[2] * x.shape[3]))
-        fc = self.final_fc(semi_fc)
-        output = self.softmax(fc)
+        output = self.final_fc(semi_fc)
+
+        if(self.type is "nominal"):
+            output = self.softmax(output)
         return output
 
 
-def train(args, model, train_loader, optimizer, epoch):
+def mnist_train(args, model, train_loader, optimizer, epoch, loss_func):
     model.train()
     correct = 0
     num = 0
-    
+
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to("cuda"), target.to("cuda")
         optimizer.zero_grad()
         output = model(data)
         pred = output.argmax(dim=1, keepdim=True) # get the index of the max log-probability
         correct += pred.eq(target.view_as(pred)).sum().item()
-        num+= pred.shape[0]
-        loss = F.nll_loss(output, target)
+        num += pred.shape[0]
+        loss = loss_func(output, target)
         loss.backward()
         optimizer.step()
-        
+
     print("Train Accuracy: " + str(correct/num*100)+"%")
 
 
-def test(args, model, test_loader, name):
+def mnist_test(args, model, test_loader, name):
     model.eval()
     test_loss = 0
     correct = 0
@@ -107,22 +110,21 @@ def test(args, model, test_loader, name):
         print("Test Accuracy: " + str(correct/num*100)+"%")
 
 
-if __name__ == '__main__':
+def mnist():
     batch_size = 512
     args = dict()
     args["epochs"] = 1000
-    args["log_interval"] = 50
     args["lr"] = 1e-4
 
     train_loader = torch.utils.data.DataLoader(
         datasets.MNIST('./data', train=True, download=True,
-        transform=transforms.Compose([transforms.ToTensor(),
-        transforms.Normalize((0.1307,), (0.3081,))])),
+                       transform=transforms.Compose([transforms.ToTensor(),
+                                                     transforms.Normalize((0.1307,), (0.3081,))])),
         batch_size=batch_size, shuffle=True)
 
     test_loader = torch.utils.data.DataLoader(
         datasets.MNIST('./data', train=False, transform=transforms.Compose([
-        transforms.ToTensor(),transforms.Normalize((0.1307,), (0.3081,))])),
+            transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])),
         batch_size=batch_size, shuffle=True)
 
     model = DenseNet().cuda()
@@ -131,4 +133,15 @@ if __name__ == '__main__':
     for epoch in range(1, args["epochs"] + 1):
         train(args, model, train_loader, optimizer, epoch)
         test(args, model, test_loader, "Epoch " + str(epoch) + " Test Accuracy ")
+
+
+
+
+
+
+
+
+
+
+
 
